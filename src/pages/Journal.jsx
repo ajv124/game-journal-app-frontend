@@ -1,18 +1,40 @@
-
 import React, { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group"
+import {
+  ArrowDownUp,
   BookOpen,
-  Gamepad2,
-  Image,
-  CalendarDays,
-  BookMarked,
-  ArrowRight,
-  CheckCircle2,
+  CircleCheck,
   Clock,
-  Library
+  Eye,
+  Gamepad2,
+  History,
+  Hourglass,
+  SearchIcon,
+  SearchX
 } from 'lucide-react'
-
+import {
+  Popover,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Button } from '@/components/ui/button'
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card"
+import { Separator } from '@/components/ui/separator'
+import { Link, useSearchParams } from 'react-router-dom'
+import { toast } from '@/components/ui/toast'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -21,83 +43,81 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-
 import {
-  Card,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card"
-
-import { Badge } from "@/components/ui/badge"
-import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
-
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty"
-
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel"
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
-
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from '@/context/AuthContext'
 import { getSavedGamesAPI } from '@/services/allAPI'
-import { toast } from '@/components/ui/toast'
+
+const statuses = [
+  { value: "tracking", icon: Eye },
+  { value: "backlog", icon: Hourglass },
+  { value: "completed", icon: CircleCheck }
+]
 
 function Journal() {
 
-  const [games, setGames] = useState([])
   const [loading, setLoading] = useState(false)
+  const [games, setGames] = useState([])
 
   const { loggedIn, authLoading } = useAuth()
 
-  const [activeTab, setActiveTab] = useState('tracking')
-
-  const [currentPages, setCurrentPages] = useState({
-    tracking: 1,
-    completed: 1,
-    backlog: 1
-  })
-
-  const gamesPerPage = 10
+  const [searchParams, setSearchParams] = useSearchParams()
+  const search = searchParams.get("search") || ""
+  const [searchInput, setSearchInput] = useState(search)
+  const sortBy = searchParams.get("sort") || "updated"
 
   useEffect(() => {
     if (authLoading) return
 
     if (loggedIn) {
-      getSavedGames()
+      getJournalGames()
     } else {
       setGames([])
       setLoading(false)
     }
   }, [loggedIn, authLoading])
 
-  const getSavedGames = async () => {
+  useEffect(() => {
+    if (searchInput === search) return
+
+    const timer = setTimeout(() => {
+      updateSearchParams({
+        search: searchInput
+      })
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  useEffect(() => {
+    setSearchInput(search)
+  }, [search])
+
+  const getJournalGames = async () => {
     try {
       setLoading(true)
-
       const response = await getSavedGamesAPI()
-
-      setGames(response || [])
-
+      setGames(response)
     } catch (error) {
       toast.add({
         title: 'Error',
@@ -109,226 +129,46 @@ function Journal() {
     }
   }
 
-  // Journal Statistics
+  const updateSearchParams = (updates) => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev)
 
-  const totalGames = games.length
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value == null || value == undefined || value == "") {
+          params.delete(key)
+        } else {
+          params.set(key, value)
+        }
+      })
 
-  // Games by Status
-
-  const trackingGames = games.filter(
-    (game) => game.status === 'tracking'
-  )
-
-  const completedGames = games.filter(
-    (game) => game.status === 'completed'
-  )
-
-  const backlogGames = games.filter(
-    (game) => game.status === 'backlog'
-  )
-
-  const statusGames = {
-    tracking: trackingGames,
-    completed: completedGames,
-    backlog: backlogGames
+      return params
+    })
   }
 
-  // Pagination
+  const latestGames = games
+    .filter((game) => game.status === "tracking")
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .slice(0, 4)
 
-  const currentGames = statusGames[activeTab]
-
-  const currentPage = currentPages[activeTab]
-
-  const totalPages = Math.ceil(currentGames.length / gamesPerPage)
-
-  const startIndex = (currentPage - 1) * gamesPerPage
-
-  const paginatedGames = currentGames.slice(
-    startIndex,
-    startIndex + gamesPerPage
-  )
-
-  const handlePageChange = (page) => {
-    setCurrentPages((prev) => ({
-      ...prev,
-      [activeTab]: page
-    }))
-  }
-
-  const getPageNumbers = () => {
-    const pages = []
-
-    if (totalPages <= 5) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i)
-      }
-    } else if (currentPage <= 3) {
-      pages.push(1, 2, 3, 4, '...', totalPages)
-    } else if (currentPage >= totalPages - 2) {
-      pages.push(
-        1,
-        '...',
-        totalPages - 3,
-        totalPages - 2,
-        totalPages - 1,
-        totalPages
-      )
-    } else {
-      pages.push(
-        1,
-        '...',
-        currentPage - 1,
-        currentPage,
-        currentPage + 1,
-        '...',
-        totalPages
-      )
+  const searchedGames = games.filter((game) =>
+    game?.name?.toLowerCase().replace(/[^a-z0-9]/g, "").includes(
+      searchInput.toLowerCase().replace(/[^a-z0-9]/g, "")
+    )
+  ).sort((a, b) => {
+    switch (sortBy) {
+      case "name":
+        return a.name.localeCompare(b.name)
+      case "added":
+        return new Date(b.createdAt) - new Date(a.createdAt)
+      default:
+        return new Date(b.updatedAt) - new Date(a.updatedAt)
     }
-
-    return pages
-  }
-
-  const handleTabChange = (value) => {
-    setActiveTab(value)
-  }
-
-  // Reusable Game Cards
-
-  const renderGameCards = (gamesList) => {
-
-    if (loading) {
-      return (
-        <div className='columns-[300px] gap-6 px-5'>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Card
-              key={i}
-              className='relative gap-0 p-0 overflow-hidden my-5 break-inside-avoid'
-            >
-              <Skeleton className='aspect-[3/4] w-full' />
-
-              <CardContent className='p-3'>
-                <Skeleton className='h-5 w-3/4' />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )
-    }
-
-    return gamesList.length > 0 ?
-
-      <div className='columns-[300px] gap-6 px-5'>
-
-        {gamesList.map((game) => (
-
-          <Card
-            key={game.gameId || game.id}
-            className='relative gap-0 p-0 overflow-hidden my-5 break-inside-avoid'
-          >
-
-            <Link to={`/journal/${game.gameId || game.id}`}>
-
-              <img
-                src={game.coverImage}
-                alt={game.name}
-                className='w-full h-auto object-contain'
-              />
-
-              <CardFooter className='flex flex-col p-3 bg-background'>
-
-                <div className='font-semibold text-base w-full'>
-                  {game.name}
-                </div>
-
-              </CardFooter>
-
-            </Link>
-
-            <CardFooter className='p-3 pt-0'>
-
-              <Button
-                nativeButton={false}
-                render={
-                  <Link
-                    to={`/journal/${game.gameId || game.id}`}
-                  />
-                }
-                variant='outline'
-                className='w-full'
-              >
-                View Journal
-                <ArrowRight size={16} />
-              </Button>
-
-            </CardFooter>
-
-          </Card>
-
-        ))}
-
-      </div>
-
-      :
-
-      <Empty className='h-80 border rounded-lg my-5'>
-
-        <EmptyHeader>
-
-          <EmptyMedia variant='icon'>
-            {activeTab === 'tracking' ?
-              <Clock size={32} />
-              : activeTab === 'completed' ?
-                <CheckCircle2 size={32} />
-                :
-                <Library size={32} />
-            }
-          </EmptyMedia>
-
-          <EmptyTitle className='text-2xl'>
-            {activeTab === 'tracking' ?
-              'Nothing currently tracking'
-              : activeTab === 'completed' ?
-                'No completed games'
-                :
-                'Your backlog is empty'
-            }
-          </EmptyTitle>
-
-          <EmptyDescription>
-            {activeTab === 'tracking' ?
-              'Games you are currently playing will appear here.'
-              : activeTab === 'completed' ?
-                'Games you have completed will appear here.'
-                :
-                'Games you plan to play will appear here.'
-            }
-          </EmptyDescription>
-
-        </EmptyHeader>
-
-        <EmptyContent>
-
-          <Button
-            nativeButton={false}
-            render={<Link to='/games' />}
-          >
-            <Gamepad2 size={16} />
-            Browse Games
-          </Button>
-
-        </EmptyContent>
-
-      </Empty>
-  }
+  })
 
   return (
     <>
-      {/* Breadcrumb */}
-
       <Breadcrumb className='m-2'>
-
         <BreadcrumbList>
-
           <BreadcrumbItem>
             <BreadcrumbLink render={<Link to={'/'} />}>
               Home
@@ -338,244 +178,248 @@ function Journal() {
           <BreadcrumbSeparator />
 
           <BreadcrumbItem>
-            <BreadcrumbPage>My Journal</BreadcrumbPage>
+            <BreadcrumbPage>Journal</BreadcrumbPage>
           </BreadcrumbItem>
-
         </BreadcrumbList>
-
       </Breadcrumb>
 
-      {/* Page Header */}
+      <div className='mx-5 my-4'>
+        <h1 className='flex items-center gap-2 text-2xl font-bold'>
+          <History />
+          Jump back in
+        </h1>
 
-      <div className='mx-5 mt-5 mb-4'>
-
-        <div className='flex flex-col gap-2'>
-
-          <h1 className='text-3xl font-bold'>
-            My Journal
-          </h1>
-
-          <p className='text-muted-foreground max-w-2xl'>
-            Your personal gaming diary. Revisit your favorite moments,
-            memorable experiences, and adventures from the games you play.
-          </p>
-
-        </div>
-
+        <p className='text-sm text-muted-foreground'>
+          Continue where you left off
+        </p>
       </div>
 
-      {/* Journal Statistics */}
+      {loading ?
+        <Card className='gap-0 p-0 overflow-hidden mx-12 md:mx-auto md:max-w-3xl my-4 bg-background'>
+          <Skeleton className="aspect-video w-full rounded-none" />
 
-      <div className='grid grid-cols-1 sm:grid-cols-3 gap-3 mx-5 my-5'>
-
-        <Card className='gap-2'>
-          <CardContent className='flex items-center gap-4 p-4'>
-
-            <div className='p-3 rounded-md bg-primary/10 text-primary'>
-              <Gamepad2 size={24} />
-            </div>
-
-            <div>
-              <p className='text-sm text-muted-foreground'>
-                Games Journaled
-              </p>
-
-              <p className='text-2xl font-bold'>
-                {totalGames}
-              </p>
-            </div>
-
-          </CardContent>
+          <CardFooter className="justify-center p-3">
+            <Skeleton className="h-5 w-1/3" />
+          </CardFooter>
         </Card>
+        : latestGames.length > 0 ?
+          <Carousel opts={{ loop: true }} className='mx-12 md:mx-auto md:max-w-3xl my-4'>
+            <CarouselContent>
+              {latestGames.map((game) => (
+                <CarouselItem key={game.gameId}>
+                  <Link to={`/journal/${game.gameId}`}>
+                    <Card className='gap-0 p-0 overflow-hidden bg-background'>
+                      <img
+                        src={game.coverImage}
+                        alt={game.name}
+                        className="w-full aspect-video object-cover"
+                      />
 
-        <Card className='gap-2'>
-          <CardContent className='flex items-center gap-4 p-4'>
+                      <CardFooter className="justify-center p-3 bg-background">
+                        <span className="text-xl text-center truncate">
+                          {game.name}
+                        </span>
+                      </CardFooter>
+                    </Card>
+                  </Link>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
 
-            <div className='p-3 rounded-md bg-primary/10 text-primary'>
-              <BookOpen size={24} />
-            </div>
+            <CarouselPrevious />
+            <CarouselNext />
+          </Carousel>
+          :
+          <Empty className='h-60'>
+            <EmptyHeader>
+              <EmptyMedia>
+                <Gamepad2 size={50} />
+              </EmptyMedia>
 
-            <div>
-              <p className='text-sm text-muted-foreground'>
-                Journal Entries
-              </p>
+              <EmptyTitle className='text-3xl'>
+                Nothing in progress
+              </EmptyTitle>
 
-              <p className='text-2xl font-bold'>
-                0
-              </p>
-            </div>
-
-          </CardContent>
-        </Card>
-
-        <Card className='gap-2'>
-          <CardContent className='flex items-center gap-4 p-4'>
-
-            <div className='p-3 rounded-md bg-primary/10 text-primary'>
-              <Image size={24} />
-            </div>
-
-            <div>
-              <p className='text-sm text-muted-foreground'>
-                Screenshots
-              </p>
-
-              <p className='text-2xl font-bold'>
-                0
-              </p>
-            </div>
-
-          </CardContent>
-        </Card>
-
-      </div>
+              <EmptyDescription className='text-xl'>
+                Games you are tracking will show up here
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+      }
 
       <Separator className='my-4' />
 
-      {/* Game Journal Collection */}
-
-      <div className='mx-5 mb-5'>
-
-        <div className='flex items-center justify-between gap-2 mb-4'>
-
-          <div>
-            <h2 className='text-xl font-bold'>
-              Your Games
-            </h2>
-
-            <p className='text-sm text-muted-foreground'>
-              Games with journal entries
-            </p>
-          </div>
-
-          <Badge variant='secondary'>
-            {totalGames} Games
-          </Badge>
-
-        </div>
-
-        {/* Status Tabs */}
-
-        <Tabs
-          value={activeTab}
-          onValueChange={handleTabChange}
-          className='w-full'
-        >
-
-          <TabsList className='w-full sm:w-auto'>
-
-            <TabsTrigger value='tracking'>
-              <Clock size={15} />
-              Currently Tracking
-
-              <Badge variant='secondary' className='ml-1'>
-                {trackingGames.length}
-              </Badge>
-            </TabsTrigger>
-
-            <TabsTrigger value='completed'>
-              <CheckCircle2 size={15} />
-              Completed
-
-              <Badge variant='secondary' className='ml-1'>
-                {completedGames.length}
-              </Badge>
-            </TabsTrigger>
-
-            <TabsTrigger value='backlog'>
-              <Library size={15} />
-              Backlog
-
-              <Badge variant='secondary' className='ml-1'>
-                {backlogGames.length}
-              </Badge>
-            </TabsTrigger>
-
-          </TabsList>
-
-          {/* Currently Tracking */}
-
-          <TabsContent value='tracking'>
-            {renderGameCards(paginatedGames)}
-          </TabsContent>
-
-          {/* Completed */}
-
-          <TabsContent value='completed'>
-            {renderGameCards(paginatedGames)}
-          </TabsContent>
-
-          {/* Backlog */}
-
-          <TabsContent value='backlog'>
-            {renderGameCards(paginatedGames)}
-          </TabsContent>
-
-        </Tabs>
-
-        {/* Pagination */}
-
-        {currentGames.length > 0 && totalPages > 1 && (
-
-          <>
-            <Separator className='my-4' />
-
-            <div className='flex justify-center items-center'>
-
-              <Pagination className='p-5 w-auto m-0'>
-
-                <PaginationContent>
-
-                  <PaginationItem>
-                    <PaginationPrevious
-                      disabled={currentPage === 1}
-                      onClick={() => handlePageChange(currentPage - 1)}
-                    />
-                  </PaginationItem>
-
-                  {getPageNumbers().map((page, index) => (
-
-                    <PaginationItem key={index}>
-
-                      {page === '...' ? (
-
-                        <span className='px-3 text-muted-foreground'>
-                          ...
-                        </span>
-
-                      ) : (
-
-                        <PaginationLink
-                          isActive={currentPage === page}
-                          onClick={() => handlePageChange(page)}
-                        >
-                          {page}
-                        </PaginationLink>
-
-                      )}
-
-                    </PaginationItem>
-
-                  ))}
-
-                  <PaginationItem>
-                    <PaginationNext
-                      disabled={currentPage === totalPages}
-                      onClick={() => handlePageChange(currentPage + 1)}
-                    />
-                  </PaginationItem>
-
-                </PaginationContent>
-
-              </Pagination>
-
-            </div>
-          </>
-
-        )}
-
+      <div className='mx-5 my-4'>
+        <h1 className='flex items-center gap-2 text-2xl font-bold'>
+          My games
+        </h1>
       </div>
 
+      <div className='flex items-center gap-2 md:gap-3 mx-5'>
+        <InputGroup className='flex-1 bg-background'>
+          <InputGroupAddon>
+            <SearchIcon />
+          </InputGroupAddon>
+
+          <InputGroupInput
+            placeholder="Search games..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </InputGroup>
+
+        <Popover>
+          <PopoverTrigger render={<Button variant='outline' />}>
+            <ArrowDownUp />
+            <span className='hidden sm:inline'>Sort</span>
+          </PopoverTrigger>
+
+          <PopoverContent className='w-auto'>
+            <PopoverHeader>
+              <PopoverTitle>Sort by</PopoverTitle>
+
+              <RadioGroup
+                className='my-2'
+                value={sortBy}
+                onValueChange={(value) =>
+                  updateSearchParams({
+                    sort: value
+                  })
+                }
+              >
+                <div className="flex items-center gap-3">
+                  <RadioGroupItem value="updated" id="updated" />
+                  <Label htmlFor="updated">Latest updated</Label>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <RadioGroupItem value="added" id="added" />
+                  <Label htmlFor="added">Date added</Label>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <RadioGroupItem value="name" id="name" />
+                  <Label htmlFor="name">Name</Label>
+                </div>
+              </RadioGroup>
+            </PopoverHeader>
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      <div className='mx-5 my-4 mb-5'>
+        {!loggedIn ?
+          <Empty className='h-100'>
+            <EmptyHeader>
+              <EmptyMedia>
+                <BookOpen size={50} />
+              </EmptyMedia>
+
+              <EmptyTitle className='text-3xl'>
+                Not logged in
+              </EmptyTitle>
+
+              <EmptyDescription className='text-xl'>
+                Login to view your journal
+              </EmptyDescription>
+
+              <EmptyContent>
+                <Button
+                  nativeButton={false}
+                  render={<Link to={'/login'} />}
+                >
+                  Login
+                </Button>
+              </EmptyContent>
+            </EmptyHeader>
+          </Empty>
+          : loading ?
+            <div className='grid justify-center grid-cols-[repeat(auto-fill,300px)] gap-6'>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Card key={i} className="overflow-hidden">
+                  <CardHeader>
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </CardHeader>
+
+                  <CardContent>
+                    <Skeleton className="aspect-video w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            :
+            <Tabs defaultValue="tracking">
+              <TabsList className='w-full bg-background'>
+                {statuses.map(({ value, icon: Icon }) => (
+                  <TabsTrigger key={value} value={value} className='capitalize'>
+                    <Icon />
+                    {value} ({searchedGames.filter((game) => game.status === value).length})
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {statuses.map(({ value }) => (
+                <TabsContent key={value} value={value}>
+                  {searchedGames.filter((game) => game.status === value).length > 0 ?
+                    <div className='columns-[300px]'>
+                      {searchedGames
+                        .filter((game) => game.status === value)
+                        .map((game) => (
+                          <Card
+                            key={game.gameId}
+                            className='gap-0 p-0 overflow-hidden my-5 bg-background'
+                          >
+                            <img
+                              src={game.coverImage}
+                              alt={game.name}
+                              className="w-full h-auto object-contain"
+                            />
+
+                            <CardFooter className="flex flex-col gap-2 p-2 bg-background">
+                              <span className="text-base w-full text-center truncate">
+                                {game.name}
+                              </span>
+
+                              <Button
+                                nativeButton={false}
+                                render={<Link to={`/journal/${game.gameId}`} />}
+                                className='w-full bg-blue-900 hover:bg-blue-900/80'
+                              >
+                                <BookOpen />
+                                Open journal
+                              </Button>
+
+                              <span className='flex items-center gap-1 text-xs text-muted-foreground'>
+                                <Clock size='12' />
+                                Last updated at {new Date(game.updatedAt).toLocaleDateString()}
+                              </span>
+                            </CardFooter>
+                          </Card>
+                        ))}
+                    </div>
+                    :
+                    <Empty className='h-100'>
+                      <EmptyHeader>
+                        <EmptyMedia>
+                          <SearchX size='50' />
+                        </EmptyMedia>
+
+                        <EmptyTitle className='text-3xl'>
+                          No games found
+                        </EmptyTitle>
+
+                        <EmptyDescription className='text-xl'>
+                          Nothing in {value} yet
+                        </EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
+                  }
+                </TabsContent>
+              ))}
+            </Tabs>
+        }
+      </div>
     </>
   )
 }
