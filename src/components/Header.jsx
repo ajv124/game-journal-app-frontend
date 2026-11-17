@@ -34,7 +34,6 @@ import {
 } from "@/components/ui/input-group"
 import { useAuth } from '@/context/AuthContext'
 import { toast } from '@/components/ui/toast'
-import { FieldGroup } from './ui/field'
 
 function Header() {
   const [openMenu, setOpenMenu] = useState(false)

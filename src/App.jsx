@@ -7,8 +7,8 @@ import Games from './pages/Games'
 import Header from './components/Header'
 import Library from './pages/Library'
 import Journal from './pages/Journal'
-import JournalDetails from './pages/JournalDetails'
 import GameDetails from './pages/GameDetails'
+import Timeline from './pages/Timeline'
 
 function App() {
 
@@ -23,7 +23,7 @@ function App() {
       <Route path='/games/:id' element={<GameDetails/>}/>
       <Route path='/library' element={<Library/>}/>
       <Route path='/journal' element={<Journal/>}/>
-      <Route path='/journal/:id' element={<JournalDetails/>}/>
+      <Route path='/journal/:id' element={<Timeline/>}/>
 
     </Routes>
     </>

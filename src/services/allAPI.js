@@ -47,3 +47,27 @@ export const getSavedGamesAPI=async()=>{
 export const removeGameAPI=async(id)=>{
     return apiService("DELETE",`/remove-game/${id}`)
 }
+
+export const createTimelineAPI=async(id,name)=>{
+    return apiService("POST",`/create-timeline/${id}`,{name})
+}
+
+export const getTimelineGameAPI=async(id)=>{
+    return apiService("GET",`/timeline-game/${id}`)
+}
+
+export const changeStatusAPI=async(id,status)=>{
+    return apiService("PUT",`/status/${id}`,{status})
+}
+
+export const getTimelinesAPI=async(id)=>{
+    return apiService("GET",`/timelines/${id}`)
+}
+
+export const getAllEntriesAPI=async(id)=>{
+    return apiService("GET",`/entries/${id}`)
+}
+
+export const createEntryAPI=async(id,entryData)=>{
+    return apiService("POST",`/create-entry/${id}`,entryData)
+}
